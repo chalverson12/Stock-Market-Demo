@@ -36,6 +36,27 @@ Play the game at: [Your GitHub Pages URL]
 
 No build process or dependencies required - it's a pure client-side application.
 
+## 🔧 Troubleshooting
+
+### Stock Data Not Loading?
+
+Due to browser security policies (CORS), direct API calls from GitHub Pages can sometimes be blocked. The app uses multiple fallback proxy servers to resolve this issue. If you encounter problems:
+
+1. **Check Browser Console**: Open Developer Tools (F12) and check the console for error messages
+2. **Try Different Stock Symbols**: Start with common symbols like MSFT, AAPL, or GOOGL
+3. **Refresh the Page**: Sometimes a simple refresh resolves temporary network issues
+4. **Try a Different Browser**: Some browsers handle CORS differently
+5. **Wait and Retry**: If you see API limit messages, wait a minute and try again
+
+### For Developers
+
+The app attempts to use these CORS proxy services in order:
+1. `api.allorigins.win` - Most reliable
+2. `cors-anywhere.herokuapp.com` - Requires activation
+3. `thingproxy.freeboard.io` - Backup option
+
+Console logging is enabled to help debug issues. Check the browser console for detailed error information.
+
 ## 📊 API Information
 
 This game uses the Alpha Vantage API to fetch real stock market data. The API provides:

@@ -44,40 +44,90 @@ class StockPredictionGame {
     }
 
     async fetchStockData(ticker) {
-        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${this.apiKey}&outputsize=full`;
+        console.log(`Fetching stock data for: ${ticker}`);
         
-        try {
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                throw new Error(`Network error: ${response.status} ${response.statusText}`);
+        // Try multiple CORS proxy solutions with fallbacks
+        const proxies = [
+            'https://api.allorigins.win/get?url=',
+            'https://cors-anywhere.herokuapp.com/',
+            'https://thingproxy.freeboard.io/fetch/'
+        ];
+        
+        const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${this.apiKey}&outputsize=full`;
+        
+        for (let i = 0; i < proxies.length; i++) {
+            try {
+                console.log(`Trying proxy ${i + 1}: ${proxies[i]}`);
+                let url, response, data;
+                
+                if (i === 0) {
+                    // allorigins method
+                    url = proxies[i] + encodeURIComponent(apiUrl);
+                    console.log(`Making request to: ${url}`);
+                    response = await fetch(url);
+                    if (!response.ok) {
+                        console.log(`Proxy ${i + 1} failed with status: ${response.status}`);
+                        continue;
+                    }
+                    const result = await response.json();
+                    data = JSON.parse(result.contents);
+                } else {
+                    // Direct proxy methods
+                    url = proxies[i] + apiUrl;
+                    console.log(`Making request to: ${url}`);
+                    response = await fetch(url, {
+                        method: 'GET',
+                        headers: i === 1 ? { 'X-Requested-With': 'XMLHttpRequest' } : {}
+                    });
+                    if (!response.ok) {
+                        console.log(`Proxy ${i + 1} failed with status: ${response.status}`);
+                        continue;
+                    }
+                    data = await response.json();
+                }
+                
+                console.log('API Response received:', data);
+                
+                // Validate the response
+                if (data['Error Message']) {
+                    throw new Error(`Invalid stock ticker "${ticker}". Please enter a valid stock symbol.`);
+                }
+                
+                if (data['Note']) {
+                    throw new Error('API call limit reached. Please try again in a minute.');
+                }
+                
+                if (data['Information']) {
+                    throw new Error('API call frequency limit reached. Please wait a minute and try again.');
+                }
+                
+                if (!data['Time Series (Daily)']) {
+                    console.log('No Time Series data found in response');
+                    if (i === proxies.length - 1) {
+                        throw new Error(`Unable to fetch data for "${ticker}". Please check the ticker symbol or try again later.`);
+                    }
+                    continue; // Try next proxy
+                }
+                
+                console.log(`Successfully fetched data using proxy ${i + 1}`);
+                this.stockData = data['Time Series (Daily)'];
+                this.clearError();
+                return; // Success!
+                
+            } catch (error) {
+                console.log(`Proxy ${i + 1} error:`, error);
+                if (i === proxies.length - 1) {
+                    // Last proxy failed, throw error
+                    if (error.message.includes('Invalid stock ticker') || 
+                        error.message.includes('API call limit') || 
+                        error.message.includes('Unable to fetch data')) {
+                        throw error;
+                    }
+                    throw new Error(`Unable to load stock data. This may be due to network issues or CORS restrictions. Please try again later.`);
+                }
+                // Continue to next proxy
+                continue;
             }
-            
-            const data = await response.json();
-            
-            if (data['Error Message']) {
-                throw new Error(`Invalid stock ticker "${ticker}". Please enter a valid stock symbol.`);
-            }
-            
-            if (data['Note']) {
-                throw new Error('API call limit reached. Please try again in a minute.');
-            }
-            
-            if (data['Information']) {
-                throw new Error('API call frequency limit reached. Please wait a minute and try again.');
-            }
-            
-            if (!data['Time Series (Daily)']) {
-                throw new Error(`Unable to fetch data for "${ticker}". Please check the ticker symbol or try again later.`);
-            }
-            
-            this.stockData = data['Time Series (Daily)'];
-            this.clearError();
-        } catch (error) {
-            if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                throw new Error('Network connection error. Please check your internet connection and try again.');
-            }
-            throw error;
         }
     }
 

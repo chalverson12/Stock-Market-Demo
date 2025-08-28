@@ -22,6 +22,15 @@ class StockPredictionGame {
         document.getElementById('predict-down').addEventListener('click', () => this.makePrediction('down'));
         document.getElementById('continue-game').addEventListener('click', () => this.continueGame());
         document.getElementById('new-game').addEventListener('click', () => this.resetGame());
+        
+        // Add event listeners for ticker example buttons
+        document.querySelectorAll('.ticker-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const ticker = e.target.getAttribute('data-ticker');
+                document.getElementById('stock-ticker').value = ticker;
+                this.handleTickerSubmission();
+            });
+        });
     }
 
     async handleTickerSubmission() {
@@ -90,7 +99,8 @@ class StockPredictionGame {
                 
                 // Validate the response
                 if (data['Error Message']) {
-                    throw new Error(`Invalid stock ticker "${ticker}". Please enter a valid stock symbol.`);
+                    const suggestions = this.getSuggestions(ticker);
+                    throw new Error(`Invalid stock ticker "${ticker}". Please enter a valid stock symbol.${suggestions}`);
                 }
                 
                 if (data['Note']) {
@@ -132,63 +142,87 @@ class StockPredictionGame {
     }
 
     generateRandomStartDate() {
+        console.log('Generating random start date...');
+        
+        // Get all available dates and sort them
+        const availableDates = Object.keys(this.stockData).sort().reverse();
+        console.log('Total available dates:', availableDates.length);
+        console.log('Date range:', availableDates[availableDates.length - 1], 'to', availableDates[0]);
+        
+        if (availableDates.length < 10) {
+            console.log('Not enough historical data, using most recent date');
+            return new Date(availableDates[availableDates.length - 1]);
+        }
+        
+        // Find dates that are at least 1 week old but not more than 100 days old
         const today = new Date();
         const oneWeekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
         const hundredDaysAgo = new Date(today.getTime() - 100 * 24 * 60 * 60 * 1000);
         
-        // Generate random date between 1 week and 100 days ago
-        const timeDiff = oneWeekAgo.getTime() - hundredDaysAgo.getTime();
-        const randomTime = Math.random() * timeDiff;
-        const randomDate = new Date(hundredDaysAgo.getTime() + randomTime);
+        const eligibleDates = availableDates.filter(dateStr => {
+            const date = new Date(dateStr);
+            return date <= oneWeekAgo && date >= hundredDaysAgo;
+        });
         
-        // Ensure it's a weekday (Monday = 1, Friday = 5)
-        while (randomDate.getDay() === 0 || randomDate.getDay() === 6) {
-            randomDate.setDate(randomDate.getDate() - 1);
-        }
+        console.log('Eligible dates for random selection:', eligibleDates.length);
         
-        // Check if we have data for this date, if not, find the nearest available date
-        const dateStr = this.formatDate(randomDate);
-        if (!this.stockData[dateStr]) {
-            return this.findNearestAvailableDate(randomDate);
-        }
-        
-        return randomDate;
-    }
-
-    findNearestAvailableDate(targetDate) {
-        const availableDates = Object.keys(this.stockData).sort().reverse();
-        const targetStr = this.formatDate(targetDate);
-        
-        // Find the closest date that's before or equal to our target
-        for (const dateStr of availableDates) {
-            if (dateStr <= targetStr) {
-                const date = new Date(dateStr);
-                // Ensure it's a weekday
-                if (date.getDay() !== 0 && date.getDay() !== 6) {
-                    return date;
+        if (eligibleDates.length === 0) {
+            // Fallback: use any date that has enough future data
+            console.log('No eligible dates in preferred range, using fallback');
+            for (let i = availableDates.length - 10; i >= 0; i--) {
+                const testDate = new Date(availableDates[i]);
+                if (this.hasEnoughFutureData(testDate, availableDates)) {
+                    return testDate;
                 }
             }
+            // Last resort: use a date from middle of available data
+            const midIndex = Math.floor(availableDates.length / 2);
+            return new Date(availableDates[midIndex]);
         }
         
-        // Fallback: use the oldest available date
-        return new Date(availableDates[availableDates.length - 1]);
+        // Pick a random date from eligible dates
+        const randomIndex = Math.floor(Math.random() * eligibleDates.length);
+        const selectedDate = new Date(eligibleDates[randomIndex]);
+        console.log('Selected random date:', this.formatDate(selectedDate));
+        
+        return selectedDate;
     }
+    
+    hasEnoughFutureData(startDate, availableDates) {
+        const startDateStr = this.formatDate(startDate);
+        const futureIndex = availableDates.indexOf(startDateStr);
+        return futureIndex >= 5; // Need at least 5 future data points
+    }
+
+
 
     formatDate(date) {
         return date.toISOString().split('T')[0];
     }
 
     async startGame() {
+        console.log('Starting game...');
+        console.log('Available stock dates:', Object.keys(this.stockData).slice(0, 10));
+        
         this.startDate = this.generateRandomStartDate();
+        console.log('Generated start date:', this.formatDate(this.startDate));
+        
         this.currentDate = new Date(this.startDate);
         this.score = 0;
         this.gameStarted = true;
         
         // Prepare initial game data (7 days before start date + start date)
         this.gameData = this.prepareInitialData();
+        console.log('Prepared game data length:', this.gameData.length);
+        console.log('Game data:', this.gameData);
         
-        if (this.gameData.length < 8) {
-            throw new Error('Insufficient data for the selected period. Please try a different stock.');
+        if (this.gameData.length < 7) {
+            console.log('Insufficient data, trying alternative approach...');
+            // Try to use more recent data instead
+            this.gameData = this.prepareAlternativeData();
+            if (this.gameData.length < 7) {
+                throw new Error('Insufficient data for the selected period. Please try a different stock.');
+            }
         }
         
         this.updateGameDisplay();
@@ -200,10 +234,12 @@ class StockPredictionGame {
         const data = [];
         const tempDate = new Date(this.startDate);
         
-        // Go back 7 days to get initial data
-        for (let i = 7; i >= 0; i--) {
+        // Go back up to 15 trading days to find 7 data points
+        for (let i = 15; i >= 0; i--) {
             const checkDate = new Date(tempDate.getTime() - i * 24 * 60 * 60 * 1000);
             const dateStr = this.formatDate(checkDate);
+            
+            console.log(`Checking date: ${dateStr}, has data: ${!!this.stockData[dateStr]}`);
             
             if (this.stockData[dateStr]) {
                 data.push({
@@ -213,7 +249,41 @@ class StockPredictionGame {
                     high: parseFloat(this.stockData[dateStr]['2. high']),
                     low: parseFloat(this.stockData[dateStr]['3. low'])
                 });
+                
+                // Stop when we have enough data points
+                if (data.length >= 8) break;
             }
+        }
+        
+        return data;
+    }
+    
+    prepareAlternativeData() {
+        // Fallback: use the most recent available data
+        const availableDates = Object.keys(this.stockData).sort().reverse();
+        const data = [];
+        
+        console.log('Using alternative data approach with dates:', availableDates.slice(0, 10));
+        
+        for (let i = 0; i < Math.min(10, availableDates.length); i++) {
+            const dateStr = availableDates[i];
+            data.push({
+                date: dateStr,
+                price: parseFloat(this.stockData[dateStr]['4. close']),
+                open: parseFloat(this.stockData[dateStr]['1. open']),
+                high: parseFloat(this.stockData[dateStr]['2. high']),
+                low: parseFloat(this.stockData[dateStr]['3. low'])
+            });
+        }
+        
+        // Reverse to get chronological order (oldest first)
+        data.reverse();
+        
+        // Update start date to match the data we're using
+        if (data.length > 0) {
+            this.startDate = new Date(data[data.length - 1].date);
+            this.currentDate = new Date(this.startDate);
+            console.log('Updated start date to:', this.formatDate(this.startDate));
         }
         
         return data;
@@ -452,6 +522,50 @@ class StockPredictionGame {
 
     showError(message) {
         document.getElementById('ticker-error').textContent = message;
+    }
+
+    getSuggestions(ticker) {
+        const commonMistakes = {
+            'APPL': 'AAPL (Apple)',
+            'GOGGLE': 'GOOGL (Google)',
+            'TESLE': 'TSLA (Tesla)',
+            'MICROS': 'MSFT (Microsoft)',
+            'AMAZN': 'AMZN (Amazon)',
+            'META': 'META (Meta/Facebook)',
+            'NVIDI': 'NVDA (NVIDIA)'
+        };
+        
+        if (commonMistakes[ticker]) {
+            return ` Did you mean ${commonMistakes[ticker]}?`;
+        }
+        
+        // Check for similar tickers
+        const popular = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'AMZN', 'NVDA', 'META'];
+        for (const stock of popular) {
+            if (this.isClose(ticker, stock)) {
+                return ` Did you mean ${stock}?`;
+            }
+        }
+        
+        return ' Try: AAPL, MSFT, GOOGL, TSLA, AMZN, or NVDA.';
+    }
+    
+    isClose(str1, str2) {
+        // Simple similarity check
+        const len1 = str1.length;
+        const len2 = str2.length;
+        
+        if (Math.abs(len1 - len2) > 1) return false;
+        
+        let differences = 0;
+        const maxLen = Math.max(len1, len2);
+        
+        for (let i = 0; i < maxLen; i++) {
+            if (str1[i] !== str2[i]) differences++;
+            if (differences > 1) return false;
+        }
+        
+        return differences <= 1;
     }
 
     clearError() {

@@ -22,6 +22,15 @@ class StockPredictionGame {
         document.getElementById('predict-down').addEventListener('click', () => this.makePrediction('down'));
         document.getElementById('continue-game').addEventListener('click', () => this.continueGame());
         document.getElementById('new-game').addEventListener('click', () => this.resetGame());
+        
+        // Add event listeners for ticker example buttons
+        document.querySelectorAll('.ticker-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const ticker = e.target.getAttribute('data-ticker');
+                document.getElementById('stock-ticker').value = ticker;
+                this.handleTickerSubmission();
+            });
+        });
     }
 
     async handleTickerSubmission() {
@@ -90,7 +99,8 @@ class StockPredictionGame {
                 
                 // Validate the response
                 if (data['Error Message']) {
-                    throw new Error(`Invalid stock ticker "${ticker}". Please enter a valid stock symbol.`);
+                    const suggestions = this.getSuggestions(ticker);
+                    throw new Error(`Invalid stock ticker "${ticker}". Please enter a valid stock symbol.${suggestions}`);
                 }
                 
                 if (data['Note']) {
@@ -452,6 +462,50 @@ class StockPredictionGame {
 
     showError(message) {
         document.getElementById('ticker-error').textContent = message;
+    }
+
+    getSuggestions(ticker) {
+        const commonMistakes = {
+            'APPL': 'AAPL (Apple)',
+            'GOGGLE': 'GOOGL (Google)',
+            'TESLE': 'TSLA (Tesla)',
+            'MICROS': 'MSFT (Microsoft)',
+            'AMAZN': 'AMZN (Amazon)',
+            'META': 'META (Meta/Facebook)',
+            'NVIDI': 'NVDA (NVIDIA)'
+        };
+        
+        if (commonMistakes[ticker]) {
+            return ` Did you mean ${commonMistakes[ticker]}?`;
+        }
+        
+        // Check for similar tickers
+        const popular = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'AMZN', 'NVDA', 'META'];
+        for (const stock of popular) {
+            if (this.isClose(ticker, stock)) {
+                return ` Did you mean ${stock}?`;
+            }
+        }
+        
+        return ' Try: AAPL, MSFT, GOOGL, TSLA, AMZN, or NVDA.';
+    }
+    
+    isClose(str1, str2) {
+        // Simple similarity check
+        const len1 = str1.length;
+        const len2 = str2.length;
+        
+        if (Math.abs(len1 - len2) > 1) return false;
+        
+        let differences = 0;
+        const maxLen = Math.max(len1, len2);
+        
+        for (let i = 0; i < maxLen; i++) {
+            if (str1[i] !== str2[i]) differences++;
+            if (differences > 1) return false;
+        }
+        
+        return differences <= 1;
     }
 
     clearError() {

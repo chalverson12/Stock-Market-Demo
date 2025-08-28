@@ -113,6 +113,46 @@ header p {
     font-size: 0.9rem;
 }
 
+.popular-tickers {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.popular-tickers p {
+    margin-bottom: 15px;
+    color: #555;
+    font-weight: 600;
+}
+
+.ticker-examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+.ticker-btn {
+    padding: 8px 15px;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.ticker-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+.ticker-btn:active {
+    transform: translateY(0);
+}
+
 /* Game Section */
 .game-info {
     margin-bottom: 25px;

@@ -19,8 +19,19 @@
             <div id="stock-input-section" class="section">
                 <div class="input-group">
                     <label for="stock-ticker">Enter Stock Ticker Symbol:</label>
-                    <input type="text" id="stock-ticker" placeholder="e.g., MSFT, AAPL, GOOGL" maxlength="5">
+                    <input type="text" id="stock-ticker" placeholder="e.g., AAPL, MSFT, GOOGL" maxlength="6">
                     <button id="submit-ticker">Start Game</button>
+                </div>
+                <div class="popular-tickers">
+                    <p><strong>Popular stocks to try:</strong></p>
+                    <div class="ticker-examples">
+                        <button class="ticker-btn" data-ticker="AAPL">AAPL (Apple)</button>
+                        <button class="ticker-btn" data-ticker="MSFT">MSFT (Microsoft)</button>
+                        <button class="ticker-btn" data-ticker="GOOGL">GOOGL (Google)</button>
+                        <button class="ticker-btn" data-ticker="TSLA">TSLA (Tesla)</button>
+                        <button class="ticker-btn" data-ticker="AMZN">AMZN (Amazon)</button>
+                        <button class="ticker-btn" data-ticker="NVDA">NVDA (NVIDIA)</button>
+                    </div>
                 </div>
                 <div id="ticker-error" class="error-message"></div>
                 <div class="info-note">

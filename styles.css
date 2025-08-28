@@ -153,6 +153,24 @@ header p {
     transform: translateY(0);
 }
 
+.test-btn {
+    margin-top: 15px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.test-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
 /* Game Section */
 .game-info {
     margin-bottom: 25px;

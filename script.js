@@ -31,6 +31,9 @@ class StockPredictionGame {
                 this.handleTickerSubmission();
             });
         });
+        
+        // Add test connection button
+        document.getElementById('test-connection').addEventListener('click', () => this.testConnection());
     }
 
     async handleTickerSubmission() {
@@ -55,47 +58,65 @@ class StockPredictionGame {
     async fetchStockData(ticker) {
         console.log(`Fetching stock data for: ${ticker}`);
         
-        // Try multiple CORS proxy solutions with fallbacks
-        const proxies = [
-            'https://api.allorigins.win/get?url=',
-            'https://cors-anywhere.herokuapp.com/',
-            'https://thingproxy.freeboard.io/fetch/'
+        // Try multiple approaches with better error handling
+        const methods = [
+            { name: 'AllOrigins', url: 'https://api.allorigins.win/get?url=' },
+            { name: 'Corsproxy.io', url: 'https://corsproxy.io/?' },
+            { name: 'CORS-Anywhere', url: 'https://cors-anywhere.herokuapp.com/' },
+            { name: 'ThingProxy', url: 'https://thingproxy.freeboard.io/fetch/' },
+            { name: 'Direct (may fail)', url: '' }
         ];
         
         const apiUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${this.apiKey}&outputsize=full`;
         
-        for (let i = 0; i < proxies.length; i++) {
+        for (let i = 0; i < methods.length; i++) {
             try {
-                console.log(`Trying proxy ${i + 1}: ${proxies[i]}`);
+                console.log(`Trying method ${i + 1}: ${methods[i].name}`);
                 let url, response, data;
                 
                 if (i === 0) {
-                    // allorigins method
-                    url = proxies[i] + encodeURIComponent(apiUrl);
+                    // AllOrigins method
+                    url = methods[i].url + encodeURIComponent(apiUrl);
                     console.log(`Making request to: ${url}`);
-                    response = await fetch(url);
+                    response = await fetch(url, { 
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' }
+                    });
                     if (!response.ok) {
-                        console.log(`Proxy ${i + 1} failed with status: ${response.status}`);
+                        console.log(`${methods[i].name} failed with status: ${response.status}`);
                         continue;
                     }
                     const result = await response.json();
+                    if (!result.contents) {
+                        console.log(`${methods[i].name} returned no contents`);
+                        continue;
+                    }
                     data = JSON.parse(result.contents);
+                } else if (i === 4) {
+                    // Direct method (last resort)
+                    console.log(`Making direct request to: ${apiUrl}`);
+                    response = await fetch(apiUrl);
+                    if (!response.ok) {
+                        console.log(`Direct method failed with status: ${response.status}`);
+                        continue;
+                    }
+                    data = await response.json();
                 } else {
-                    // Direct proxy methods
-                    url = proxies[i] + apiUrl;
+                    // Proxy methods
+                    url = methods[i].url + apiUrl;
                     console.log(`Making request to: ${url}`);
                     response = await fetch(url, {
                         method: 'GET',
-                        headers: i === 1 ? { 'X-Requested-With': 'XMLHttpRequest' } : {}
+                        headers: methods[i].name === 'CORS-Anywhere' ? { 'X-Requested-With': 'XMLHttpRequest' } : {}
                     });
                     if (!response.ok) {
-                        console.log(`Proxy ${i + 1} failed with status: ${response.status}`);
+                        console.log(`${methods[i].name} failed with status: ${response.status}`);
                         continue;
                     }
                     data = await response.json();
                 }
                 
-                console.log('API Response received:', data);
+                console.log(`${methods[i].name} response:`, data);
                 
                 // Validate the response
                 if (data['Error Message']) {
@@ -112,30 +133,32 @@ class StockPredictionGame {
                 }
                 
                 if (!data['Time Series (Daily)']) {
-                    console.log('No Time Series data found in response');
-                    if (i === proxies.length - 1) {
+                    console.log(`${methods[i].name}: No Time Series data found in response`);
+                    if (i === methods.length - 1) {
                         throw new Error(`Unable to fetch data for "${ticker}". Please check the ticker symbol or try again later.`);
                     }
-                    continue; // Try next proxy
+                    continue; // Try next method
                 }
                 
-                console.log(`Successfully fetched data using proxy ${i + 1}`);
+                console.log(`✅ Successfully fetched data using ${methods[i].name}`);
                 this.stockData = data['Time Series (Daily)'];
                 this.clearError();
                 return; // Success!
                 
             } catch (error) {
-                console.log(`Proxy ${i + 1} error:`, error);
-                if (i === proxies.length - 1) {
-                    // Last proxy failed, throw error
-                    if (error.message.includes('Invalid stock ticker') || 
-                        error.message.includes('API call limit') || 
-                        error.message.includes('Unable to fetch data')) {
-                        throw error;
-                    }
-                    throw new Error(`Unable to load stock data. This may be due to network issues or CORS restrictions. Please try again later.`);
+                console.log(`❌ ${methods[i].name} error:`, error.message);
+                
+                // If this is a specific API error (not network), don't continue
+                if (error.message.includes('Invalid stock ticker') || 
+                    error.message.includes('API call limit')) {
+                    throw error;
                 }
-                // Continue to next proxy
+                
+                if (i === methods.length - 1) {
+                    // All methods failed
+                    throw new Error(`Unable to load stock data for "${ticker}". This could be due to:\n1. Network connectivity issues\n2. CORS proxy services being down\n3. API rate limits\n\nPlease try:\n• Refreshing the page\n• Using a different browser\n• Trying again in a few minutes`);
+                }
+                // Continue to next method
                 continue;
             }
         }
@@ -566,6 +589,19 @@ class StockPredictionGame {
         }
         
         return differences <= 1;
+    }
+
+    async testConnection() {
+        console.log('Testing API connection...');
+        this.showError('Testing connection to Alpha Vantage API...');
+        
+        try {
+            await this.fetchStockData('AAPL');
+            this.showError('✅ API Connection successful! Try entering a stock ticker.');
+        } catch (error) {
+            console.log('Connection test failed:', error);
+            this.showError(`❌ Connection test failed: ${error.message}`);
+        }
     }
 
     clearError() {
